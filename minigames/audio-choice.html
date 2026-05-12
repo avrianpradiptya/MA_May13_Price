@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mini Game: Guess the Song</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: #7c3aed;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 20px;
+      gap: 16px;
+    }
+
+    h2 {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(1.3rem, 4vw, 1.8rem);
+      color: #fff;
+      text-align: center;
+    }
+
+    .game-card {
+      background: #fff;
+      border-radius: 24px;
+      padding: 32px 28px;
+      width: min(680px, 96%);
+      box-shadow: 0 6px 32px rgba(0,0,0,0.25);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 22px;
+    }
+
+    /* ── PLAYER AREA ── */
+    #player-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      width: 100%;
+    }
+
+    /* Vinyl disc animation */
+    #vinyl {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      background: repeating-radial-gradient(
+        circle,
+        #1a1a2e 0px, #1a1a2e 8px,
+        #2d2d44 8px, #2d2d44 10px
+      );
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      transition: transform 0.3s;
+    }
+    #vinyl.spinning {
+      animation: spin 3s linear infinite;
+    }
+    #vinyl-center {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #7c3aed;
+      border: 3px solid #fff;
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    /* Play button */
+    #play-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #7c3aed;
+      color: #fff;
+      border: none;
+      border-radius: 50px;
+      padding: 14px 32px;
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: background .2s, transform .15s;
+    }
+    #play-btn:hover:not(:disabled) { background: #6d28d9; transform: scale(1.04); }
+    #play-btn:disabled { background: #aaa; cursor: not-allowed; transform: none; }
+
+    #play-icon { font-size: 1.4rem; }
+
+    /* Replay counter */
+    #replay-counter {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #888;
+    }
+    #replay-counter.exhausted { color: #e53935; }
+
+    /* Progress bar for snippet */
+    #snippet-bar-wrap {
+      width: 100%;
+      background: #eee;
+      border-radius: 50px;
+      height: 8px;
+      overflow: hidden;
+    }
+    #snippet-bar {
+      height: 100%;
+      width: 0%;
+      background: #7c3aed;
+      border-radius: 50px;
+      transition: width .1s linear;
+    }
+
+    /* Question text */
+    #question-text {
+      font-weight: 800;
+      font-size: clamp(1rem, 3vw, 1.2rem);
+      text-align: center;
+      color: #1a2340;
+    }
+
+    /* Options */
+    .options-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .option-btn {
+      background: #43a047;
+      color: #fff;
+      border: none;
+      border-radius: 50px;
+      padding: 16px 28px;
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.05rem;
+      text-align: left;
+      cursor: pointer;
+      transition: background .2s, transform .15s;
+    }
+    .option-btn:hover:not(:disabled) { background: #388e3c; transform: scale(1.02); }
+    .option-btn:disabled { cursor: not-allowed; }
+    .option-btn.correct { background: #1b5e20 !important; }
+    .option-btn.wrong   { background: #e53935 !important; }
+
+    /* Feedback */
+    #feedback {
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.4rem;
+      min-height: 2rem;
+      text-align: center;
+    }
+    #feedback.correct { color: #43a047; }
+    #feedback.wrong   { color: #e53935; }
+
+    /* Timer bar (answer countdown) */
+    #timer-bar-wrap {
+      width: 100%;
+      background: #eee;
+      border-radius: 50px;
+      height: 10px;
+      overflow: hidden;
+    }
+    #timer-bar {
+      height: 100%;
+      background: #fb8c00;
+      border-radius: 50px;
+      transition: width .1s linear, background .3s;
+    }
+  </style>
+</head>
+<body>
+
+  <h2 id="minigame-title">🎵 Guess the Song / Artist</h2>
+
+  <div class="game-card">
+
+    <!-- Audio player (hidden native element) -->
+    <audio id="audio-player" preload="auto"></audio>
+
+    <!-- Vinyl + play controls -->
+    <div id="player-area">
+      <div id="vinyl"><div id="vinyl-center"></div></div>
+      <button id="play-btn" onclick="playSnippet()">
+        <span id="play-icon">▶</span>
+        <span id="play-label">Play Snippet</span>
+      </button>
+      <div id="replay-counter"></div>
+      <div id="snippet-bar-wrap">
+        <div id="snippet-bar"></div>
+      </div>
+    </div>
+
+    <div id="question-text"></div>
+
+    <!-- Answer timer -->
+    <div id="timer-bar-wrap"><div id="timer-bar" style="width:100%"></div></div>
+
+    <div class="options-grid" id="options-grid"></div>
+    <div id="feedback"></div>
+
+  </div>
+
+  <script>
+    // ════════════════════════════════════════════════════════
+    //  QUESTIONS — edit freely.
+    //  audio: path to your .mp3 file, relative to this file.
+    //         e.g. '../audio/mysong.mp3'
+    //  snippetSeconds: how many seconds of the clip to play.
+    //  maxReplays: how many times the group can replay (0 = unlimited).
+    //  startAt: (optional) start playback at this second (default 0).
+    // ════════════════════════════════════════════════════════
+    const QUESTIONS = [
+      {
+        title:   '🎷 Guess the Song - Speaker on',
+        question: 'Whats the title of this song?',
+        audio:   '../audio/pulauKelapa.mp3',
+        snippetSeconds: 20,
+        startAt: 0,
+        maxReplays: 2,
+        options: [
+          { label: 'A', text: 'Halo-halo Bandung'   },
+          { label: 'B', text: 'Indonesia Pusaka'   },
+          { label: 'C', text: 'Rayuan Pulau Kelapa' },
+          { label: 'D', text: 'Bangun Pemudi Pemuda'  },
+        ],
+        correct: 'C',
+      },
+      {
+        title:   '🎷 Guess the Song - Speaker on',
+        question: 'What is the title of this song?',
+        audio:   '../audio/somebodyThat.mp3',
+        snippetSeconds: 20,
+        startAt: 0,   // skip first 15s, play from 0:15
+        maxReplays: 1,
+        options: [
+          { label: 'A', text: 'Photograph'   },
+          { label: 'B', text: 'Somebody That I Used to Know'    },
+          { label: 'C', text: 'WAP'   },
+          { label: 'D', text: 'In Da Club'   },
+        ],
+        correct: 'B',
+      },
+    ];
+
+    // ── CONFIG ─────────────────────────────────────────────
+    const TIMER_SECONDS = 20;   // answer countdown (starts after first play)
+    const QUEUE_KEY     = 'audio_mcq_queue';
+
+    // ── QUEUE (no-repeat across rounds, same as multiple-choice) ──
+    function shuffle(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function getNextQuestionIndex() {
+      let queue = JSON.parse(sessionStorage.getItem(QUEUE_KEY) || '[]');
+      if (queue.length === 0) queue = shuffle(QUESTIONS.map((_, i) => i));
+      const idx = queue.shift();
+      sessionStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+      return idx;
+    }
+
+    // ── LOAD QUESTION ───────────────────────────────────────
+    const q         = QUESTIONS[getNextQuestionIndex()];
+    const audio     = document.getElementById('audio-player');
+    audio.src       = q.audio;
+
+    document.getElementById('minigame-title').textContent = q.title;
+    document.getElementById('question-text').textContent  = q.question;
+
+    // ── REPLAY STATE ────────────────────────────────────────
+    let playsUsed   = 0;
+    const maxPlays  = q.maxReplays === 0 ? Infinity : q.maxReplays + 1; // +1: first play counts
+    let snippetTimer = null;
+    let answered    = false;
+
+    updateReplayCounter();
+
+    function updateReplayCounter() {
+      const el      = document.getElementById('replay-counter');
+      const remaining = maxPlays === Infinity
+        ? '∞'
+        : Math.max(0, maxPlays - playsUsed);
+
+      if (maxPlays === Infinity) {
+        el.textContent = 'Unlimited replays';
+        el.className   = '';
+      } else if (remaining > 0) {
+        el.textContent = `Plays remaining: ${remaining}`;
+        el.className   = '';
+      } else {
+        el.textContent = 'No more replays!';
+        el.className   = 'exhausted';
+      }
+    }
+
+    // ── PLAY SNIPPET ────────────────────────────────────────
+    function playSnippet() {
+      if (playsUsed >= maxPlays || answered) return;
+      playsUsed++;
+      updateReplayCounter();
+
+      // Disable button if out of plays
+      if (playsUsed >= maxPlays) {
+        document.getElementById('play-btn').disabled = true;
+      }
+
+      // Update button label while playing
+      document.getElementById('play-icon').textContent  = '⏹';
+      document.getElementById('play-label').textContent = 'Playing…';
+
+      // Spin vinyl
+      document.getElementById('vinyl').classList.add('spinning');
+
+      // Seek to startAt
+      audio.currentTime = q.startAt || 0;
+      audio.play();
+
+      // Snippet progress bar
+      const snippetEnd = (q.startAt || 0) + q.snippetSeconds;
+      clearInterval(snippetTimer);
+      snippetTimer = setInterval(() => {
+        const elapsed = audio.currentTime - (q.startAt || 0);
+        const pct     = Math.min(100, (elapsed / q.snippetSeconds) * 100);
+        document.getElementById('snippet-bar').style.width = pct + '%';
+
+        if (audio.currentTime >= snippetEnd) {
+          stopAudio();
+        }
+      }, 100);
+
+      // Start answer timer on first play only
+      if (playsUsed === 1) startAnswerTimer();
+    }
+
+    function stopAudio() {
+      audio.pause();
+      clearInterval(snippetTimer);
+      document.getElementById('vinyl').classList.remove('spinning');
+      document.getElementById('play-icon').textContent  = '▶';
+      document.getElementById('play-label').textContent = 'Replay';
+      document.getElementById('snippet-bar').style.width = '100%';
+    }
+
+    // Auto-stop when audio ends naturally too
+    audio.addEventListener('ended', stopAudio);
+
+    // ── ANSWER TIMER ────────────────────────────────────────
+    let timeLeft    = TIMER_SECONDS;
+    let timerDone   = false;
+    let answerTick  = null;
+
+    function startAnswerTimer() {
+      // Build options now (hidden until first play)
+      buildOptions();
+      document.getElementById('options-grid').style.display = 'flex';
+
+      answerTick = setInterval(() => {
+        timeLeft -= 0.1;
+        const pct = Math.max(0, (timeLeft / TIMER_SECONDS) * 100);
+        const bar = document.getElementById('timer-bar');
+        bar.style.width = pct + '%';
+        if (pct < 30) bar.style.background = '#e53935';
+
+        if (timeLeft <= 0 && !timerDone) {
+          clearInterval(answerTick);
+          timerDone = true;
+          timeoutAnswer();
+        }
+      }, 100);
+    }
+
+    // ── BUILD OPTIONS ───────────────────────────────────────
+    // Options hidden until first play so they can't read ahead
+    function buildOptions() {
+      const grid = document.getElementById('options-grid');
+      grid.innerHTML = '';
+      q.options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className     = 'option-btn';
+        btn.dataset.label = opt.label;
+        btn.textContent   = `${opt.label}. ${opt.text}`;
+        btn.addEventListener('click', () => handleAnswer(opt.label, btn));
+        grid.appendChild(btn);
+      });
+    }
+
+    // Hide options until audio plays
+    document.getElementById('options-grid').style.display = 'none';
+
+    // ── HANDLE ANSWER ───────────────────────────────────────
+    function handleAnswer(label, clickedBtn) {
+      if (timerDone || answered) return;
+      clearInterval(answerTick);
+      timerDone = true;
+      answered  = true;
+
+      stopAudio();
+      disableAll();
+
+      const correct = label === q.correct;
+      document.querySelectorAll('.option-btn').forEach(btn => {
+        if (btn.dataset.label === q.correct) btn.classList.add('correct');
+      });
+      if (!correct) clickedBtn.classList.add('wrong');
+
+      const fb = document.getElementById('feedback');
+      fb.textContent = correct ? '✅ Correct!' : '❌ Wrong answer!';
+      fb.className   = correct ? 'correct' : 'wrong';
+
+      setTimeout(() => sendResult(correct), 1800);
+    }
+
+    function timeoutAnswer() {
+      answered = true;
+      stopAudio();
+      disableAll();
+      document.querySelectorAll('.option-btn').forEach(btn => {
+        if (btn.dataset.label === q.correct) btn.classList.add('correct');
+      });
+      const fb = document.getElementById('feedback');
+      fb.textContent = '⏰ Time\'s up!';
+      fb.className   = 'wrong';
+      setTimeout(() => sendResult(false), 1800);
+    }
+
+    function disableAll() {
+      document.querySelectorAll('.option-btn').forEach(btn => btn.disabled = true);
+      document.getElementById('play-btn').disabled = true;
+    }
+
+    // ── REPORT RESULT ───────────────────────────────────────
+    function sendResult(win) {
+      window.parent.postMessage({ result: win }, '*');
+    }
+  </script>
+</body>
+</html>

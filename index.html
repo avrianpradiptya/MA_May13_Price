@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Price is Right Game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ───── RESET & ROOT ───── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sky: #29b6f6;
+      --sky-dark: #0288d1;
+      --green: #43a047;
+      --green-light: #66bb6a;
+      --orange: #fb8c00;
+      --orange-light: #ffa726;
+      --yellow: #fdd835;
+      --red: #e53935;
+      --white: #ffffff;
+      --bg: #f0f9ff;
+      --text: #1a2340;
+      --card-radius: 16px;
+      --shadow: 0 4px 16px rgba(0,0,0,0.13);
+    }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 32px;
+    }
+
+    /* ───── HEADER ───── */
+    header {
+      width: 100%;
+      max-width: 1100px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 18px;
+    }
+    header h1 {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(2rem, 5vw, 2.8rem);
+      color: var(--text);
+      letter-spacing: 1px;
+    }
+    #round-display {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(1.2rem, 3vw, 1.7rem);
+      color: var(--text);
+    }
+
+    /* ───── PRODUCT DISPLAY AREA ───── */
+    #product-area {
+      width: 100%;
+      max-width: 1100px;
+      border: 3px solid var(--text);
+      border-radius: var(--card-radius);
+      background: #fff;
+      min-height: 340px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #product-img {
+      max-width: 100%;
+      max-height: 340px;
+      object-fit: contain;
+      display: none;
+    }
+
+    #product-placeholder {
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.5rem;
+      color: #aaa;
+    }
+
+    #actual-price-badge {
+      display: none;
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: var(--orange);
+      color: #fff;
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.4rem;
+      padding: 8px 20px;
+      border-radius: 50px;
+      box-shadow: var(--shadow);
+    }
+
+    /* ───── MINIGAME IFRAME ───── */
+    #minigame-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #minigame-overlay.active { display: flex; }
+    #minigame-frame {
+      width: min(820px, 96vw);
+      height: min(600px, 90vh);
+      border: none;
+      border-radius: 20px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+      background: #fff;
+    }
+
+    /* ───── RESULT OVERLAY (winner of face-off) ───── */
+    #result-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.15);
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    #result-overlay.active { display: flex; }
+    #result-card {
+      background: var(--orange);
+      border-radius: 20px;
+      padding: 32px 44px;
+      text-align: center;
+      box-shadow: var(--shadow);
+      max-width: 520px;
+      animation: popIn .35s cubic-bezier(.34,1.56,.64,1);
+    }
+    #result-card h2 {
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.6rem;
+      color: var(--yellow);
+      margin-bottom: 8px;
+    }
+    #result-card p {
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+    #result-card .points-badge {
+      font-family: 'Fredoka One', cursive;
+      font-size: 3rem;
+      color: var(--yellow);
+    }
+    #result-card .points-label {
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.4rem;
+      color: #fff;
+    }
+    #result-card button {
+      margin-top: 20px;
+      background: #fff;
+      color: var(--orange);
+      border: none;
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.2rem;
+      padding: 12px 36px;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: transform .15s;
+    }
+    #result-card button:hover { transform: scale(1.06); }
+
+    /* ───── MINIGAME RESULT TOAST ───── */
+    #toast {
+      display: none;
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 200;
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.4rem;
+      padding: 14px 40px;
+      border-radius: 50px;
+      color: #fff;
+      box-shadow: var(--shadow);
+      animation: slideUp .3s ease;
+    }
+    #toast.win  { background: var(--green); display: block; }
+    #toast.lose { background: var(--red);   display: block; }
+
+    /* ───── WINNER SCREEN ───── */
+    #winner-screen {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: var(--sky);
+      z-index: 300;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+    }
+    #winner-screen.active { display: flex; }
+    #winner-screen h1 {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(2.5rem, 8vw, 5rem);
+      color: #fff;
+      text-shadow: 4px 4px 0 rgba(0,0,0,0.15);
+    }
+    #winner-screen .winner-name {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(2rem, 7vw, 4rem);
+      color: var(--yellow);
+      text-shadow: 3px 3px 0 rgba(0,0,0,0.15);
+    }
+    #final-scores {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 10px;
+    }
+    .final-score-card {
+      background: rgba(255,255,255,0.25);
+      border-radius: 16px;
+      padding: 18px 28px;
+      text-align: center;
+    }
+    .final-score-card .name {
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.2rem;
+      color: #fff;
+    }
+    .final-score-card .score {
+      font-family: 'Fredoka One', cursive;
+      font-size: 2rem;
+      color: var(--yellow);
+    }
+    #play-again-btn {
+      margin-top: 20px;
+      background: #fff;
+      color: var(--sky-dark);
+      border: none;
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.3rem;
+      padding: 14px 44px;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: transform .15s;
+    }
+    #play-again-btn:hover { transform: scale(1.06); }
+
+    /* ───── PLAYER PANEL (bottom) ───── */
+    #player-panel {
+      width: 100%;
+      max-width: 1100px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr) auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .player-col {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .score-chip {
+      background: var(--sky);
+      color: #fff;
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.3rem;
+      text-align: center;
+      padding: 8px 0;
+      border-radius: var(--card-radius);
+      transition: background .4s;
+    }
+    .score-chip.highlight { background: var(--orange); }
+
+    .player-card {
+      background: var(--sky);
+      border-radius: var(--card-radius);
+      padding: 12px 10px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .player-card .player-name {
+      font-weight: 800;
+      font-size: 1rem;
+      color: #fff;
+      text-align: center;
+    }
+    .player-card input {
+      width: 100%;
+      background: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-family: 'Nunito', sans-serif;
+      font-size: 1rem;
+      font-style: italic;
+      color: #555;
+      text-align: center;
+      outline: none;
+      transition: box-shadow .2s;
+    }
+    .player-card input:focus {
+      box-shadow: 0 0 0 3px var(--sky-dark);
+      font-style: normal;
+      color: var(--text);
+    }
+    .player-card.winner-flash {
+      animation: winnerFlash .6s ease 2;
+    }
+
+    /* ───── CONFIRM BUTTON ───── */
+    #confirm-btn {
+      background: var(--green);
+      color: #fff;
+      border: none;
+      border-radius: var(--card-radius);
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.3rem;
+      padding: 0 20px;
+      min-height: 110px;
+      cursor: pointer;
+      transition: background .2s, transform .15s;
+      box-shadow: var(--shadow);
+      white-space: nowrap;
+    }
+    #confirm-btn:hover { background: var(--green-light); transform: scale(1.04); }
+    #confirm-btn:disabled { background: #aaa; cursor: not-allowed; transform: none; }
+
+    /* ───── ANIMATIONS ───── */
+    @keyframes popIn {
+      from { transform: scale(.7); opacity: 0; }
+      to   { transform: scale(1);  opacity: 1; }
+    }
+    @keyframes slideUp {
+      from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+      to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+    }
+    @keyframes winnerFlash {
+      0%,100% { background: var(--sky); }
+      50%      { background: var(--orange); }
+    }
+    @keyframes dupeShake {
+      0%,100% { transform: translateX(0); }
+      20%     { transform: translateX(-7px); }
+      40%     { transform: translateX(7px); }
+      60%     { transform: translateX(-5px); }
+      80%     { transform: translateX(5px); }
+    }
+    .player-card.dupe-shake {
+      animation: dupeShake .45s ease;
+      outline: 3px solid var(--red);
+    }
+    @keyframes confetti-fall {
+      0%   { transform: translateY(-10px) rotate(0deg);   opacity: 1; }
+      100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
+
+    /* ───── CONFETTI ───── */
+    .confetti-piece {
+      position: fixed;
+      width: 12px;
+      height: 12px;
+      top: -10px;
+      border-radius: 2px;
+      animation: confetti-fall linear forwards;
+      z-index: 400;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <h1>Price is Right Game</h1>
+    <div id="round-display">Round <span id="current-round">1</span>/<span id="total-rounds">5</span></div>
+  </header>
+
+  <!-- PRODUCT DISPLAY -->
+  <div id="product-area">
+    <img id="product-img" src="" alt="Product" />
+    <div id="product-placeholder">📦 Product image will appear here</div>
+    <div id="actual-price-badge">Actual Price: <span id="actual-price-text"></span></div>
+
+    <!-- FACE-OFF RESULT (overlaid on product area) -->
+    <div id="result-overlay">
+      <div id="result-card">
+        <h2 id="result-winner-name">Group X wins!</h2>
+        <p id="result-desc">Group X's guess is closest to the actual price!</p>
+        <div class="points-badge" id="result-points">100</div>
+        <div class="points-label">points at stake!</div>
+        <button onclick="startMinigame()">▶ Play Mini Game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLAYER PANEL -->
+  <div id="player-panel">
+    <!-- Generated by JS -->
+    <button id="confirm-btn" onclick="confirmGuesses()">Confirm</button>
+  </div>
+
+  <!-- MINIGAME OVERLAY -->
+  <div id="minigame-overlay">
+    <iframe id="minigame-frame" id="minigame-frame" allow="autoplay"></iframe>
+  </div>
+
+  <!-- MINIGAME RESULT TOAST -->
+  <div id="toast"></div>
+
+  <!-- WINNER SCREEN -->
+  <div id="winner-screen">
+    <h1>🏆 Game Over!</h1>
+    <div class="winner-name" id="winner-name-display"></div>
+    <div id="final-scores"></div>
+    <button id="play-again-btn" onclick="resetGame()">Play Again</button>
+  </div>
+
+  <script src="game.js"></script>
+  <script>
+    // ─────────────────────────────────────────────
+    //  GAME CONFIG — edit these freely
+    // ─────────────────────────────────────────────
+    const CONFIG = {
+      TOTAL_ROUNDS: 10,          // ← change number of rounds here
+      POINTS_PER_ROUND: 100,    // points awarded for winning a round
+      PLAYER_NAMES: ['Group 1', 'Group 2', 'Group 3', 'Group 4'],
+
+      // Each round: { image, actualPrice, minigame }
+      // image: path to product image (800×340px recommended)
+      // actualPrice: number
+      // minigame: filename inside minigames/ folder
+      ROUNDS: [
+        { image: 'images/product1.jpg', actualPrice: 2715000, minigame: 'audio-choice.html' },
+        { image: 'images/product2.jpg', actualPrice: 11999000, minigame:'audio-choice.html'},
+        { image: 'images/product3.jpg', actualPrice: 375000, minigame: 'shell-game.html' },
+        { image: 'images/product4.jpg', actualPrice: 380000, minigame: 'multiple-choice.html' },
+        { image: 'images/product5.jpg', actualPrice: 23911000, minigame: 'multiple-choice.html' },
+        { image: 'images/product6.jpg', actualPrice: 193000, minigame: 'multiple-choice.html' },
+        { image: 'images/product7.jpg', actualPrice: 198000, minigame: 'multiple-choice.html' },
+        { image: 'images/product8.jpg', actualPrice: 3689000, minigame: 'multiple-choice.html' },
+        { image: 'images/product9.jpg', actualPrice: 55000, minigame: 'multiple-choice.html'      },
+        { image: 'images/product10.jpg', actualPrice: 72999, minigame: 'multiple-choice.html' },
+      ]
+    };
+    // ─────────────────────────────────────────────
+
+    initGame(CONFIG);
+  </script>
+</body>
+</html>

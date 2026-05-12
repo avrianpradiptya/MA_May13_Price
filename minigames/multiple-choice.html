@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mini Game: Multiple Choice</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: #fdd835;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 20px;
+    }
+
+    h2 {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(1.3rem, 4vw, 1.8rem);
+      color: #1a2340;
+      margin-bottom: 22px;
+      text-align: center;
+    }
+
+    .game-card {
+  background: #fff;
+  border-radius: 24px;
+  /* Reduced horizontal padding to give the image more room */
+  padding: 32px 15px; 
+  /* Increase width to fill the iframe nearly entirely */
+  width: 95%; 
+  box-shadow: 0 6px 32px rgba(0,0,0,0.13);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+    /* Optional image/illustration */
+    #question-img {
+  /* Occupy 95% of the parent container */
+  width: 95%; 
+  /* Maintain height automatically based on image proportions */
+  height: auto; 
+  /* Prevent the image from becoming a giant pixelated mess on huge screens */
+  max-width: 100%; 
+  
+  object-fit: contain;
+  border-radius: 12px;
+  display: none;
+  
+  /* Optional: adds a nice pop to a larger image */
+  margin-bottom: 10px; 
+}
+
+    #question-img.visible { display: block; }
+
+    #question-text {
+      font-weight: 800;
+      font-size: clamp(1rem, 3vw, 1.25rem);
+      text-align: center;
+      color: #1a2340;
+      line-height: 1.4;
+    }
+
+    .options-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .option-btn {
+      background: #43a047;
+      color: #fff;
+      border: none;
+      border-radius: 50px;
+      padding: 16px 28px;
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.1rem;
+      text-align: left;
+      cursor: pointer;
+      transition: background .2s, transform .15s;
+    }
+    .option-btn:hover:not(:disabled) { background: #388e3c; transform: scale(1.02); }
+    .option-btn:disabled { cursor: not-allowed; }
+    .option-btn.correct  { background: #1b5e20 !important; }
+    .option-btn.wrong    { background: #e53935 !important; }
+
+    #feedback {
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.4rem;
+      min-height: 2rem;
+      text-align: center;
+    }
+    #feedback.correct { color: #43a047; }
+    #feedback.wrong   { color: #e53935; }
+
+    /* Timer bar */
+    #timer-bar-wrap {
+      width: 100%;
+      background: #eee;
+      border-radius: 50px;
+      height: 10px;
+      overflow: hidden;
+    }
+    #timer-bar {
+      height: 100%;
+      background: #fb8c00;
+      border-radius: 50px;
+      transition: width .1s linear, background .3s;
+    }
+  </style>
+</head>
+<body>
+
+  <h2 id="minigame-title">Mini Game: Multiple Choice</h2>
+
+  <div class="game-card">
+    <img id="question-img" src="" alt="Question image" />
+    <div id="timer-bar-wrap"><div id="timer-bar" style="width:100%"></div></div>
+    <div id="question-text">Loading…</div>
+    <div class="options-grid" id="options-grid"></div>
+    <div id="feedback"></div>
+  </div>
+
+  <script>
+    // ════════════════════════════════════════════════════
+    //  MINI GAME DATA — Edit questions here freely.
+    //  Each object: { title, question, image(optional),
+    //                 options: [{label, text}],
+    //                 correct: 'A'|'B'|'C'|'D' }
+    // ════════════════════════════════════════════════════
+    const QUESTIONS = [
+      {
+        title:    'Mini Game: Guess the Person',
+        question: 'Who was Indonesian president after Megawati?',
+        timerSeconds: 15,
+        image:    '',   // e.g. '../images/soekarno.jpg'
+        options: [
+          { label: 'A', text: 'Soeharto'       },
+          { label: 'B', text: 'B.J. Habibie'       },
+          { label: 'C', text: 'Susilo Bambang Yudhoyono'   },
+          { label: 'D', text: 'Joko Widodo'        },
+        ],
+        correct: 'C',
+      },
+      {
+        title:    'Mini Game: Science Fact',
+        question: 'What is the chemical symbol for table salt?',
+        timerSeconds: 15,
+        image:    '',
+        options: [
+          { label: 'A', text: 'CO₂' },
+          { label: 'B', text: 'NaCl' },
+          { label: 'C', text: 'H₂O'  },
+          { label: 'D', text: 'O₂'   },
+        ],
+        correct: 'B',
+      },
+      {
+        title:    'Mini Game: Geography',
+        question: 'What is the capital city of Vietnam?',
+        timerSeconds: 15,
+        image:    '',
+        options: [
+          { label: 'A', text: 'Beijing'  },
+          { label: 'B', text: 'Seoul'    },
+          { label: 'C', text: 'Bangkok'  },
+          { label: 'D', text: 'Hanoi'    },
+        ],
+        correct: 'D',
+      },
+      {
+        title:    'Mini Game: Bahasa Indonesia',
+        question: 'Lanjutkan peribahasa berikut: "Seperti telur ... "?',
+        timerSeconds: 15,
+        image:    '',
+        options: [
+          { label: 'A', text: 'di ujung tanduk'  },
+          { label: 'B', text: 'dalam tempurung'    },
+          { label: 'C', text: 'yang menetas'  },
+          { label: 'D', text: 'di dalam cangkang'    },
+        ],
+        correct: 'A',
+      },
+      {
+        title:    'Mini Game: Find the Difference',
+        question: 'How many differences can you find in the two pictures?',
+        timerSeconds: 15,
+        image:    'images/findDif.jpg',
+        options: [
+          { label: 'A', text: '3'  },
+          { label: 'B', text: '4'    },
+          { label: 'C', text: '5'  },
+          { label: 'D', text: '6'    },
+        ],
+        correct: 'C',
+      },
+      {
+        title:    'Mini Game: Places of Interest',
+        question: 'Which city the following places locate in?',
+        image:    'images/tuguJogja.jpg',
+        timerSeconds: 15,
+        options: [
+          { label: 'A', text: 'Bandung'  },
+          { label: 'B', text: 'Semarang'    },
+          { label: 'C', text: 'Yogyakarta'  },
+          { label: 'D', text: 'Surabaya'    },
+        ],
+        correct: 'C',
+      },
+      {
+        title:    'Mini Game: Math Problem',
+        question: 'Adi is currently 3 times Budi`s age. In 5 years, their combined age will be 30. What is Adi`s current age?',
+        timerSeconds: 120,
+        image:    '',
+        options: [
+          { label: 'A', text: '5'  },
+          { label: 'B', text: '10'    },
+          { label: 'C', text: '15'  },
+          { label: 'D', text: '20'    },
+        ],
+        correct: 'C',
+      },
+
+
+
+    ];
+
+    // ─── CONFIG ─────────────────────────────────────
+    //const TIMER_SECONDS = 15;   // seconds to answer
+    //const TIMER_SECONDS = q.timerSeconds ?? 15;
+
+    // ─── PICK NEXT QUESTION (no repeats until all used) ──
+    // Uses sessionStorage to persist a shuffled queue across
+    // iframe reloads. Clears automatically when page is refreshed.
+    const QUEUE_KEY = 'mcq_queue';
+
+
+    function getNextQuestionIndex() {
+  let current = parseInt(sessionStorage.getItem(QUEUE_KEY) || '0');
+  const idx = current % QUESTIONS.length;
+  sessionStorage.setItem(QUEUE_KEY, current + 1);
+  return idx;
+}
+
+    const q = QUESTIONS[getNextQuestionIndex()];
+
+    // ─── RENDER ──────────────────────────────────────
+    document.getElementById('minigame-title').textContent = q.title;
+    document.getElementById('question-text').textContent  = q.question;
+
+    if (q.image) {
+      const img = document.getElementById('question-img');
+      img.src = q.image;
+      img.classList.add('visible');
+    }
+
+    const grid = document.getElementById('options-grid');
+    q.options.forEach(opt => {
+      const btn = document.createElement('button');
+      btn.className       = 'option-btn';
+      btn.dataset.label   = opt.label;
+      btn.textContent     = `${opt.label}. ${opt.text}`;
+      btn.addEventListener('click', () => handleAnswer(opt.label, btn));
+      grid.appendChild(btn);
+    });
+
+    // ─── TIMER ───────────────────────────────────────
+    let timeLeft  = q.timerSeconds;
+    let timerDone = false;
+    const bar     = document.getElementById('timer-bar');
+
+    const tick = setInterval(() => {
+      timeLeft -= 0.1;
+      const pct = Math.max(0, (timeLeft / q.timerSeconds) * 100);
+      bar.style.width = pct + '%';
+      if (pct < 30) bar.style.background = '#e53935';
+      if (timeLeft <= 0 && !timerDone) {
+        clearInterval(tick);
+        timerDone = true;
+        timeoutAnswer();
+      }
+    }, 100);
+
+    // ─── HANDLE ANSWER ───────────────────────────────
+    function handleAnswer(label, clickedBtn) {
+      if (timerDone) return;
+      clearInterval(tick);
+      timerDone = true;
+
+      disableAll();
+
+      const correct = label === q.correct;
+
+      // Highlight correct & wrong
+      document.querySelectorAll('.option-btn').forEach(btn => {
+        if (btn.dataset.label === q.correct) btn.classList.add('correct');
+      });
+      if (!correct) clickedBtn.classList.add('wrong');
+
+      const feedback = document.getElementById('feedback');
+      feedback.textContent = correct ? '✅ Correct!' : '❌ Wrong answer!';
+      feedback.className   = correct ? 'correct' : 'wrong';
+
+      setTimeout(() => sendResult(correct), 1800);
+    }
+
+    function timeoutAnswer() {
+      disableAll();
+      // Reveal correct answer
+      document.querySelectorAll('.option-btn').forEach(btn => {
+        if (btn.dataset.label === q.correct) btn.classList.add('correct');
+      });
+      const feedback = document.getElementById('feedback');
+      feedback.textContent = '⏰ Time\'s up!';
+      feedback.className   = 'wrong';
+      setTimeout(() => sendResult(false), 1800);
+    }
+
+    function disableAll() {
+      document.querySelectorAll('.option-btn').forEach(btn => btn.disabled = true);
+    }
+
+    // ─── REPORT RESULT TO PARENT ─────────────────────
+    function sendResult(win) {
+      window.parent.postMessage({ result: win }, '*');
+    }
+  </script>
+</body>
+</html>

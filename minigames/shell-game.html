@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mini Game: Shell Game</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: #29b6f6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 16px;
+      gap: 16px;
+      overflow: hidden;
+    }
+
+    h2 {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(1.3rem, 4vw, 1.8rem);
+      color: #fff;
+      text-align: center;
+    }
+
+    #instruction {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+      text-align: center;
+      min-height: 1.6rem;
+    }
+
+    #stage {
+      position: relative;
+      width: min(560px, 96vw);
+      height: 240px;
+      margin-top: 20px;
+    }
+
+/* Update these specific styles in your <style> tag */
+
+.cup-wrapper {
+  position: absolute;
+  top: 0;
+  width: 140px;
+  height: 200px; /* Give it a set height */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end; /* Keep everything at the bottom */
+  transition: left 0.4s cubic-bezier(.68,-0.55,.27,1.55);
+}
+
+.ball {
+  position: absolute;
+  bottom: 20px; /* Position it on the "floor" */
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fdd835, #fb8c00);
+  transition: opacity 0.3s;
+  z-index: 1; /* Behind the cup */
+}
+
+.cup {
+  width: 110px;
+  height: 130px;
+  background: linear-gradient(160deg, #7b3f00, #5d2e00);
+  border-radius: 12px 12px 50% 50% / 12px 12px 30px 30px;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+  position: relative;
+  z-index: 2; /* In front of the ball */
+  transition: transform 0.5s ease-out, background 0.3s;
+  margin-bottom: 10px;
+}
+
+/* This creates the 'lift' effect */
+.reveal-correct .cup, 
+.reveal-wrong .cup {
+  transform: translateY(-80px) rotate(-5deg); /* Lift and slight tilt */
+}
+
+    .cup-btn {
+      margin-top: 15px;
+      background: #fff;
+      color: #1a2340;
+      border: none;
+      border-radius: 50px;
+      font-family: 'Fredoka One', cursive;
+      font-size: 0.9rem;
+      padding: 8px 20px;
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s;
+    }
+
+    .cup-btn.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .cup-btn:hover { background: #fdd835; transform: scale(1.05); }
+
+    .reveal-correct .cup { background: linear-gradient(160deg, #1b5e20, #43a047); }
+    .reveal-wrong .cup { background: linear-gradient(160deg, #b71c1c, #e53935); }
+
+    #feedback {
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.6rem;
+      color: #fff;
+      text-align: center;
+      min-height: 2.2rem;
+    }
+  </style>
+</head>
+<body>
+  <h2>🎩 Shell Game</h2>
+  <div id="instruction">Watch the ball!</div>
+
+  <div id="stage"></div>
+
+  <div id="feedback"></div>
+
+  <script>
+    const NUM_CUPS = 3;
+    const SHUFFLES = 8;
+    const SWAP_SPEED = 450;
+
+    let cups = []; // Array of cup objects
+    let winningCupId = null;
+    let isTransitioning = false;
+
+    const stage = document.getElementById('stage');
+    const stageW = stage.offsetWidth;
+
+    // Calculate x position based on index
+    function getXPos(index) {
+      const spacing = stageW / NUM_CUPS;
+      return (spacing * index) + (spacing / 2) - 70;
+    }
+
+    // Initialize Game
+    function init() {
+      // Pick a random cup to have the ball at start
+      winningCupId = Math.floor(Math.random() * NUM_CUPS);
+
+      for (let i = 0; i < NUM_CUPS; i++) {
+        const wrap = document.createElement('div');
+        wrap.className = 'cup-wrapper';
+        wrap.style.left = getXPos(i) + 'px';
+
+        const ball = document.createElement('div');
+        ball.className = 'ball';
+        ball.style.opacity = (i === winningCupId) ? '1' : '0';
+
+        const cup = document.createElement('div');
+        cup.className = 'cup';
+
+        const btn = document.createElement('button');
+        btn.className = 'cup-btn';
+        btn.textContent = 'Pick Me';
+        btn.onclick = () => handleGuess(i);
+
+        wrap.appendChild(ball);
+        wrap.appendChild(cup);
+        wrap.appendChild(btn);
+        stage.appendChild(wrap);
+
+        cups.push({ id: i, element: wrap, ball: ball });
+      }
+
+      // Start sequence
+      setTimeout(hideAndShuffle, 1500);
+    }
+
+    function hideAndShuffle() {
+      cups.forEach(c => c.ball.style.opacity = '0');
+      document.getElementById('instruction').textContent = 'Shuffling...';
+      
+      let count = 0;
+      const interval = setInterval(() => {
+        shuffleArray();
+        updatePositions();
+        count++;
+        if (count >= SHUFFLES) {
+          clearInterval(interval);
+          setTimeout(enableGuessing, 600);
+        }
+      }, SWAP_SPEED);
+    }
+
+    // Simple Fisher-Yates shuffle
+    function shuffleArray() {
+      for (let i = cups.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [cups[i], cups[j]] = [cups[j], cups[i]];
+      }
+    }
+
+    function updatePositions() {
+      cups.forEach((cupObj, index) => {
+        cupObj.element.style.left = getXPos(index) + 'px';
+      });
+    }
+
+    function enableGuessing() {
+      document.getElementById('instruction').textContent = 'Where is the ball?';
+      document.querySelectorAll('.cup-btn').forEach(btn => btn.classList.add('visible'));
+    }
+
+function handleGuess(guessedId) {
+  if (isTransitioning) return;
+  isTransitioning = true;
+
+  // Hide all buttons
+  document.querySelectorAll('.cup-btn').forEach(btn => btn.classList.remove('visible'));
+  
+  const isCorrect = (guessedId === winningCupId);
+  const feedback = document.getElementById('feedback');
+  
+  // 1. Find the actual winning cup object in the array
+  const winner = cups.find(c => c.id === winningCupId);
+  
+  // 2. Make the ball visible (it's hidden behind the cup)
+  winner.ball.style.opacity = '1';
+  
+  // 3. Add the reveal class to trigger the CSS 'lift'
+  setTimeout(() => {
+    winner.element.classList.add('reveal-correct');
+
+    if (!isCorrect) {
+      const loser = cups.find(c => c.id === guessedId);
+      loser.element.classList.add('reveal-wrong');
+      feedback.textContent = '❌ Wrong cup!';
+    } else {
+      feedback.textContent = '✅ You found it!';
+    }
+  }, 100); // Tiny delay to ensure opacity registers
+
+  // Send result to parent
+  setTimeout(() => {
+    window.parent.postMessage({ result: isCorrect }, '*');
+  }, 2000);
+}
+
+    init();
+  </script>
+</body>
+</html>
